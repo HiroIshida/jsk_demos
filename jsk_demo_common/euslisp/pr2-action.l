@@ -1462,13 +1462,15 @@
 (defun hand-over (arm &key (wait-shock nil))
   (ros::spin-once)
   (let* ((av (send *ri* :state :potentio-vector))
+         (current-torso-angle (aref av 0))
+         (torso-angle-inseq current-torso-angle)
          (tuckarm (check-tuckarm-pose))
          (isfreearm (eq arm tuckarm))
          ;; this is for :larm
-         (avs (list #f(12 0 64 70 -122 50 -115 160 -4 74 -105 -90 70 -5 20 2 15)
-                    #f(12 6 9 106 -77 35 -124 -128 -4 75 -104 -89 70 0 20 3 30)
-                    #f(12 13 21 62 -105 -117 -66 -71 -4 74 -104 -89 70 -5 20 4 40)
-                    #f(12 9 24 50 -94 -158 -70 39 -4 74 -104 -89 70 -5 20 5 30)))
+         (avs (list (float-vector torso-angle-inseq 0 64 70 -122 50 -115 160 -4 74 -105 -90 70 -5 20 2 15)
+                    (float-vector torso-angle-inseq 6 9 106 -77 35 -124 -128 -4 75 -104 -89 70 0 20 3 30)
+                    (float-vector torso-angle-inseq 13 21 62 -105 -117 -66 -71 -4 74 -104 -89 70 -5 20 4 40)
+                    (float-vector torso-angle-inseq 9 24 50 -94 -158 -70 39 -4 74 -104 -89 70 -5 20 5 30)))
          (tms (make-list (length avs) :initial-element 1000))
          (l-r-reverse #f(1  -1 1 -1 1 -1 1 -1  -1 1 -1 1 -1 1 -1  -1 1)))
     ;;
@@ -1482,6 +1484,7 @@
                                l-r-reverse))
                       avs)))
     ;;
+    #|
     (unless isfreearm
       (pr2-reset-pose)
       (let ((avs-length (length avs)))
@@ -1489,6 +1492,7 @@
 	      tms (subseq tms (- avs-length 2))
 	      av (send *ri* :state :potentio-vector)))
       (setq tuckarm arm))
+    |#
     ;;
     (send *ri* :angle-vector-sequence avs tms)
     (send *ri* :wait-interpolation)
@@ -1507,8 +1511,8 @@
     (send *ri* :move-gripper arm 0.00 :wait nil)
     (send *ri* :wait-interpolation)
     ;;
-    (send *pr2* :angle-vector (send *ri* :state :potentio-vector))
-    (pr2-tuckarm-pose tuckarm)
+    ;(send *pr2* :angle-vector (send *ri* :state :potentio-vector))
+    ;(pr2-tuckarm-pose tuckarm)
     ))
 
 (defun tray-detection (obj)
