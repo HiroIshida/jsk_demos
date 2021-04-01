@@ -10,6 +10,8 @@
 (setq *use-arm-navigation* nil)
 
 (require :pr2-interface "package://pr2eus/pr2-interface.l")
+(require :pr2-move "package://jsk_demo_common/euslisp/pr2-move.l")
+(require :pr2-action "package://jsk_demo_common/euslisp/pr2-action.l")
 
 ;; these functions are fetched from jsk_demo_common/euslisp/pr2-move.l
 (load "package://jsk_maps/src/eng2-scene.l")
@@ -18,18 +20,12 @@
 (warn "goto-front-of-fridge~%")
 (defun base-go-to-fridge (&key (wait t))
   (let ((co (send *scene* :spot "/eng2/7f/room73B2-fridge-front")))
-    (send co :translate (float-vector 200 250 0) :world)
-    (send co :rotate -0.3 :z :world)
+    ;(send co :translate (float-vector 100 0 0) :world)
+    (send co :translate (float-vector 350 250 0) :world)
+    (send co :rotate -0.2 :z :local)
     (if (send *ri* :simulation-modep)
         (setq co (send *room73b2* :spot "fridge-front-spot")))
-    (cond
-     ((equal wait t)
-      (send *ri* :move-to co)
-      )
-     (t
-      (send *ri* :move-to-send co)
-      ))
-    t
+    (send *ri* :move-to co :no-wait nil)
     ))
 
 (defun base-go-to-fridge-init-pose (&key (wait t) (torso-lift 130) (head-pitch 0))
@@ -44,7 +40,7 @@
 
 (defun goto-front-of-fridge (&key (torso-lift 130) (head-pitch 0) (wait t))
   (base-go-to-fridge :wait wait)
-  (base-go-to-fridge-init-pose :torso-lift torso-lift :head-pitch head-pitch :wait wait)
+  ;(base-go-to-fridge-init-pose :torso-lift torso-lift :head-pitch head-pitch :wait wait)
   )
 
 ;; fetched from euslisp/main.l
@@ -86,5 +82,48 @@
         ))
   )
 
+(defun goto-initial-position (&key (return-to-initial-position t)
+                                   (use-arm :rarm)
+                                   (turnp t) (finish-type :pass-to-human))
+  (when turnp
+    (send *ri* :go-pos-unsafe 0 0 -90)
+    (send *ri* :wait-interpolation))
+
+  (when return-to-initial-position
+    (if (and (boundp '*use-voicetext*) *use-voicetext*)
+        (cond
+         ((and (boundp '*use-english*) *use-english*)
+          (speak-jp (format nil "I will bring  ~a." *type*)))
+         (t (speak-jp (format nil "~aを持って行きます。" *type*))))
+      (speak-jp (format nil "~a を もって いきます" *type*)))
+    (send *ri* :move-to *opose*))
+
+  (case finish-type
+    (:put-on-turtlebot
+     (put-can-on-turtlebot))
+    ((:pass-to-human t)
+     (if (and (boundp '*use-voicetext*) *use-voicetext*)
+         (cond
+          ((and (boundp '*use-english*) *use-english*)
+           (speak-jp (format nil "Please take ~a." *type*)))
+          (t (speak-jp (format nil "~aをどうぞ。" *type*))))
+       (speak-jp (format nil "~a を どうぞ" *type*)))
+     (hand-over use-arm :wait-shock t)
+     )
+    )
+  t
+  )
+
 (init)
+(setq *type* "georgia")
+(setq *opose* (send *ri* :state :worldcoords))
 (warn ";; (goto-front-of-fridge)~%")
+(goto-front-of-fridge)
+(speak-jp "目的地に到着しました.")
+
+(ros::wait-for-service "start_plan")
+(setq req (instance std_srvs::TriggerRequest :init))
+(ros::service-call "start_plan" req)
+
+(pr2-tuckarm-pose :larm :outside)
+(goto-initial-position :use-arm :larm)
